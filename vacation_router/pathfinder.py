@@ -68,12 +68,12 @@ def backtrack(k, d):
         yield from backtrack(d[k], d)
         yield k
 
-def get_path(k, G):
+def get_path(k, d, G):
     """
     Args:
         k: the key of the least time dictionary
     """
-    path_ints = list(backtrack(k, parent))
+    path_ints = list(backtrack(k, d))
     return [G.nodes[i] for i, _ in path_ints]
         
 # # %%

@@ -4,9 +4,8 @@ import pytest
 from pathlib import Path
 from vacation_router.parser import get_distance_graph
 
-def test_get_distance_graph(user_input_df):
-    df = user_input_df
-    graph = get_distance_graph(df)
+def test_get_distance_graph(ex_graph):
+    graph = ex_graph
     assert graph.number_of_nodes() == 24
     assert graph.number_of_edges() == 24 * 23 / 2
     # Make sure the all the nodes have 'time' and 'interest' attributes
