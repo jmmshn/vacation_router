@@ -9,9 +9,14 @@ import heapq
 from icecream import ic
 
 
-def parse_kml_to_df(kml_file, interest_and_time):
+def parse_user_inputs_to_df(kml_file, user_input_csv):
     """
     Parses a KML file into a Pandas DataFrame.
+    Args:
+        kml_file: The path to the KML file.
+        user_input_csv: A csv file with the interest score and time of each location
+    Returns:
+        A Pandas DataFrame with all the relevant information about the locations.
     """
     data = []
     # Parse the KML file
@@ -25,7 +30,7 @@ def parse_kml_to_df(kml_file, interest_and_time):
         data.append([name, float(coords[0]), float(coords[1])])
     # Create a Pandas DataFrame
     df = pd.DataFrame(data, columns=["name", "longitude", "latitude"])
-    add_data = pd.read_csv(interest_and_time, index_col=["name"])
+    add_data = pd.read_csv(user_input_csv, index_col=["name"])
     df = df.join(add_data, how="inner", on="name")
     df.reset_index(inplace=True, drop=True)
     return df
@@ -37,7 +42,8 @@ def get_distance_graph(df, avg_speed=10):
     each pair of points. The average speed of a bus is 10 m/s.
     Args:
         df: A Pandas DataFrame with the coordinates of the points.
-        avg_speed: The average speed of the buses in km/h.
+        avg_speed: The average speed of the buses in km/h. 
+            Default is 10 km/h which is roughly the average speed of public transit in major cities.
     Returns:
         A networkx graph.
     """
@@ -53,6 +59,7 @@ def get_distance_graph(df, avg_speed=10):
                 df.index[j],
                 weight=get_distance_meters(df.iloc[i], df.iloc[j]) / 1000 / avg_speed,
             )
+    # add data to nodes
     attrs = dict()
     for itr, row in df.iterrows():
         attrs[itr] = {"name": row["name"], "time": row.time / 60, "interest": row.Total}  # get time in hours
@@ -92,92 +99,3 @@ def get_distance_meters_from_coords(lon1, lat1, lon2, lat2):
     d = R * c
     return d
 
-
-
-
-
-def dijkstra_with_node_value(G, source):
-    """
-    Starting from a source point, returns the shortest path from the source to
-    all other points in the graph. Also add the node value in the evaluation.
-    Note: this can be done easier by using a DiGraph and adding the node times onto each arriving edge.
-    But I thought think this is fun excercise to code up dijkstra's algorithm with additional operations with the node values.
-    This might be useful for the future.
-    Args:
-        G: A networkx graph.
-        source: The source node in the graph.
-    """
-    conn_dict = dict(G.adjacency())
-    least_time = defaultdict(lambda: float("inf"))
-    most_interest = defaultdict(lambda: float("inf"))
-    def _get_time(node):
-        return G.nodes[node]["time"]
-    def _get_interest(node):
-        return -G.nodes[node]["interest"] # negative since we want to maximize the interest
-    pq = [(_get_interest(source), _get_time(source), source)]
-    least_time[source] = _get_time(source)
-    most_interest[source] = _get_interest(source)
-    parents = dict()
-    
-    while pq:
-        interest, time, node = heapq.heappop(pq)
-        # print(cost, least_cost[node])
-        if time > least_time[node]:
-            continue
-        # print(conn_dict[node])
-        for neighbor, d_node in conn_dict[node].items():
-            # print(neighbor, d_node["weight"])
-            d_time = d_node["weight"] + _get_time(neighbor)
-            new_time = time + d_time
-            new_interest = interest + _get_interest(neighbor)
-            # print(f"{node}->{neighbor}", new_cost, cost, d_node["weight"], _get_time(neighbor))
-            if new_interest < most_interest[neighbor]:
-                least_time[neighbor] = new_time
-                most_interest[neighbor] = new_interest
-                parents[neighbor] = node
-                heapq.heappush(pq, (new_time, new_interest, neighbor))
-    
-    for node in G.nodes:
-        ic(node, least_time[node], most_interest[node])
-    
-# %%
-def bellman_ford(G, source):
-    """
-    Starting from a source point, returns the shortest path from the source to
-    all other points in the graph.
-    Args:
-        G: A networkx graph.
-        source: The source node in the graph.
-    """
-    most_interest = defaultdict(lambda: float("-inf"))
-    least_time = defaultdict(lambda: float("inf"))
-    visited = defaultdict(set) # set of visited nodes including the current node
-    predecessor = defaultdict(lambda: None)
-
-    def _get_time(node):
-        return G.nodes[node]["time"]
-    def _get_interest(node):
-        return G.nodes[node]["interest"] 
-    
-    most_interest[source] = _get_interest(source)
-    least_time[source] = _get_time(source)
-    visited[source].add(source)
-    # for i in range(len(G) - 1):
-    for i in range(3):
-        for u, v, d in G.edges(data=True):
-            new_interest = most_interest[u] + _get_interest(v)
-            new_time = least_time[u] + d["weight"] + _get_time(v)
-            # print(f"{u}->{v}", new_interest, most_interest[v])
-            if new_interest >= most_interest[v] and v not in visited[u] and d["weight"] < 0.2:
-                most_interest[v] = new_interest
-                least_time[v] = least_time[u] + d["weight"] + _get_time(v)
-                predecessor[v] = u
-                visited[v] = visited[u] | {v}
-    return most_interest, least_time, visited
-# most_interest, least_time, visited = bellman_ford(G, "Royal Ontario Museum")
-# most_interest, least_time, visited = map(pd.Series, [most_interest, least_time, visited])
-# df = pd.concat([most_interest, least_time, visited], axis=1)
-# df.columns = ["interest", "time", "visited"]
-# df1 = pd.DataFrame(df.visited.values.tolist()) \
-#         .rename(columns = lambda x: 'visited{}'.format(x+1)) \
-#         .fillna('-')

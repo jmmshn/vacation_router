@@ -8,7 +8,7 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-df = parse_kml_to_df("./Toronto2021.kml", "./interest_and_time.csv")
+df = parse_user_inputs_to_df("./Toronto2021.kml", "./interest_and_time.csv")
 df.to_csv('parsed_df.csv')
 G = get_distance_graph(df)
 
