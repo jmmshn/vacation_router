@@ -18,7 +18,7 @@ def test_get_valid_puturbed_masks():
 def test_get_best_perturbed_masks():
     score_func = lambda x: x
     test_masks = [0b10000101000, 0b01010101010, 0b10101010101, 0b11111111111]
-    new_masks = get_best_perturbed_masks(test_masks, lam=5, valid_bitmasks=set(range(1000000)), score_func=score_func)
+    new_masks = get_best_perturbed_masks(test_masks, lam=5, valid_bitmasks=range(1000000), score_func=score_func)
     assert len(new_masks) == 4
     # check that there is no bit clashing
     assert new_masks[0] & (new_masks[1] | new_masks[2] | new_masks[3]) == 0
