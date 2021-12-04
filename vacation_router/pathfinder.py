@@ -2,15 +2,10 @@
 from collections import defaultdict, deque
 
 from monty.serialization import dumpfn
-from parser import *
 from tqdm import tqdm
 import logging
 
 _logger = logging.getLogger(__name__)
-
-df = parse_user_inputs_to_df("./Toronto2021.kml", "./interest_and_time.csv")
-df.to_csv('parsed_df.csv')
-G = get_distance_graph(df)
 
 # %%
 def find_best_paths(G, max_time):
@@ -61,35 +56,7 @@ def find_best_paths(G, max_time):
                     parent[nn, new_bit_mask] = (curr_node, bit_mask)
                     queue.append((nn, new_bit_mask))
     return least_time,parent
-# %%
-least_time, parent = find_best_paths(G, 11)
-# %%
-# Remove the key were never set
-least_time = {k: v for k, v in least_time.items() if v != float('inf')}
 
-# %%
-# Validate
-def get_node_data_from_bitmask(G, bit_mask):
-    return [G.nodes()[i] for i in range(len(G.nodes())) if bit_mask & (1 << i) != 0]
-
-for (node, bit_mask), best_time in tqdm(least_time.items()):
-    if best_time == float('inf'):
-        continue
-    node_data = get_node_data_from_bitmask(G, bit_mask)
-    name_set = set([n['name'] for n in node_data])
-    assert best_time, sum(df[df.name.isin(name_set)].time) / 60
-least_time_dict = {str(k): v for k, v in least_time.items() if v != float('inf')}
-parent_dict = {str(k): v for k, v in parent.items() if v != None}
-dumpfn(least_time_dict, 'least_time.json', indent=2)
-dumpfn(parent_dict, 'parent.json', indent=2)
-
-# %%
-best_end_for_bm = dict()
-best_time_for_bm = defaultdict(lambda : float('inf'))
-for (k, bm),v in tqdm(least_time.items()):
-    if k < best_time_for_bm[bm]:
-        best_end_for_bm[bm], best_time_for_bm[bm] = (k, bm), v
-# %%
 def backtrack(k, d):
     """
     Go back from value->key to find the path.
@@ -109,12 +76,37 @@ def get_path(k, G):
     path_ints = list(backtrack(k, parent))
     return [G.nodes[i] for i, _ in path_ints]
         
-get_path((16, 65560), G)
-# %%
-best_path_for_bm = {k: get_path(v, G) for k, v in best_end_for_bm.items()}
+# # %%
+# least_time, parent = find_best_paths(G, 11)
+# # %%
+# # Remove the key were never set
+# least_time = {k: v for k, v in least_time.items() if v != float('inf')}
 
-# %%
-dumpfn(best_path_for_bm, 'best_path_for_bm.json', indent=2)
-dumpfn(best_end_for_bm, 'best_end_for_bm.json', indent=2)
+# # %%
+# # Validate
+# def get_node_data_from_bitmask(G, bit_mask):
+#     return [G.nodes()[i] for i in range(len(G.nodes())) if bit_mask & (1 << i) != 0]
 
-# %%
+# for (node, bit_mask), best_time in tqdm(least_time.items()):
+#     if best_time == float('inf'):
+#         continue
+#     node_data = get_node_data_from_bitmask(G, bit_mask)
+#     name_set = set([n['name'] for n in node_data])
+#     assert best_time, sum(df[df.name.isin(name_set)].time) / 60
+# least_time_dict = {str(k): v for k, v in least_time.items() if v != float('inf')}
+# parent_dict = {str(k): v for k, v in parent.items() if v != None}
+# dumpfn(least_time_dict, 'least_time.json', indent=2)
+# dumpfn(parent_dict, 'parent.json', indent=2)
+
+# # %%
+# best_end_for_bm = dict()
+# best_time_for_bm = defaultdict(lambda : float('inf'))
+# for (k, bm),v in tqdm(least_time.items()):
+#     if k < best_time_for_bm[bm]:
+#         best_end_for_bm[bm], best_time_for_bm[bm] = (k, bm), v
+# get_path((16, 65560), G)
+# best_path_for_bm = {k: get_path(v, G) for k, v in best_end_for_bm.items()}
+
+# dumpfn(best_path_for_bm, 'best_path_for_bm.json', indent=2)
+# dumpfn(best_end_for_bm, 'best_end_for_bm.json', indent=2)
+

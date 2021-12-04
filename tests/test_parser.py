@@ -2,28 +2,10 @@
 # %%
 import pytest
 from pathlib import Path
-from vacation_router.parser import parse_user_inputs_to_df, get_distance_graph
+from vacation_router.parser import get_distance_graph
 
-
-@pytest.fixture
-def user_files():
-    test_files_dir = Path(__file__).parent.parent / "test_files"
-    return {
-        "kml": str(test_files_dir / "Toronto2021.kml"),
-        "loc_data": str(test_files_dir / "interest_and_time.csv"),
-    }
-
-
-def test_parse_user_inputs_to_df(user_files):
-    df = parse_user_inputs_to_df(
-        user_files["kml"], user_input_csv=user_files["loc_data"]
-    )
-    assert df.shape[0] == 24
-
-def test_get_distance_graph(user_files):
-    df = parse_user_inputs_to_df(
-        user_files["kml"], user_input_csv=user_files["loc_data"]
-    )
+def test_get_distance_graph(user_input_df):
+    df = user_input_df
     graph = get_distance_graph(df)
     assert graph.number_of_nodes() == 24
     assert graph.number_of_edges() == 24 * 23 / 2
