@@ -9,7 +9,7 @@ def test_perturb_bitmask():
     res = perturb_bitmask(0b1111, lam=5, belong_to=set(range(16)), exclude_mask=0b111111111)
     assert res == 0
  
-def test_get_valid_puturbed_masks():
+def test_get_valid_perturbed_masks():
     test_masks = [0b10000101000, 0b01010101010, 0b10101010101]
     new_masks = get_valid_puturbed_masks(test_masks, lam=5, valid_bitmasks=set(range(1000000)))
     assert len(new_masks) == 3

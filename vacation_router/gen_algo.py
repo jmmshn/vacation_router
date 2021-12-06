@@ -10,6 +10,7 @@ import numpy as np
 from tqdm import tqdm
 import logging
 from dataclasses import dataclass
+import random
 
 _logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ def get_valid_puturbed_masks(bitmasks: List[float], valid_bitmasks: set=None, la
     """
     updated_masks = []
     seent_bits = 0
+    _logger.debug(f"bitmasks: {bitmasks}")
     for bm in bitmasks:
         new_mask = perturb_bitmask(
             bm, belong_to=valid_bitmasks, exclude_mask=seent_bits, lam=lam
@@ -90,6 +92,9 @@ def get_best_perturbed_masks(
     randomized_masks = get_valid_puturbed_masks(
         bitmasks[:-1], set(valid_bitmasks), lam=lam
     )
+    if len(randomized_masks) != len(bitmasks) - 1:
+        raise Exception("Failed to perturb masks")
+
     best_final_mask = None
     all_masked_bits = reduce(lambda x, y: x | y, randomized_masks)
     best_score = -float("inf")
@@ -115,59 +120,61 @@ class GenePool:
     valid_bitmasks: set
     high_score: bool
     n_keep: int
-
-    def _get_mask(self):
-        bms = np.random.choice(self.valid_bitmasks, self.n_masks, replace=False)
-        return get_best_perturbed_masks(
-            bitmasks=bms,
-            valid_bitmasks=self.valid_bitmasks,
-            lam=self.lam,
-            score_func=self.score_func,
-            high_score=self.high_score,
-        )
-
+    
     def __post_init__(self):
+        def _get_mask():
+            print(len(self.valid_bitmasks), self.n_masks)
+            bms = random.sample(self.valid_bitmasks, self.n_masks)
+            return get_best_perturbed_masks(
+                bitmasks=bms,
+                valid_bitmasks=set(self.valid_bitmasks),
+                lam=self.lam,
+                score_func=self.score_func,
+                high_score=self.high_score,
+            )
         self.factor = self.n_masks // self.n_keep
-        self.n_masks = self.factor * self.n_keep
-        self.pop = [self._get_mask() for _ in range(self.pop_size)]
+        self.pop = [_get_mask() for _ in range(self.pop_size)]
 
-    def get_most_fit(self):
-        """
-        Get the top most fit bitmasks
-        """
-        return sorted(
-            self.pop, key=lambda x: self.score_func(x[-1]), reverse=self.high_score
-        )[: self.n_keep]
 
-    def mutate(self, bitmasks: List[int]):
-        """
-        Mutate a list of bitmasks
-        Args:
-            bitmasks: a list of bitmasks
-        """
-        return get_best_perturbed_masks(
-            bitmasks, self.valid_bitmasks, self.lam, self.score_func, self.high_score
-        )
 
-    def step(self):
-        """
-        Step the genetic algorithm
-        """
-        bms = self.get_most_fit()
-        bms *= chain.from_iterable(bms * self.factor)
+    # def get_most_fit(self):
+    #     """
+    #     Get the top most fit bitmasks
+    #     """
+    #     return sorted(
+    #         self.pop, key=lambda x: self.score_func(x[-1]), reverse=self.high_score
+    #     )[: self.n_keep]
+
+    # def mutate(self, bitmasks: List[int]):
+    #     """
+    #     Mutate a list of bitmasks
+    #     Args:
+    #         bitmasks: a list of bitmasks
+    #     """
+    #     return get_best_perturbed_masks(
+    #         bitmasks, self.valid_bitmasks, self.lam, self.score_func, self.high_score
+    #     )
+
+    # def step(self):
+    #     """
+    #     Step the genetic algorithm
+    #     """
+    #     bms = self.get_most_fit()
+    #     bms *= chain.from_iterable(bms * self.factor)
 
 
 # %%
+logging.basicConfig(level=logging.DEBUG)
 genepool = GenePool(
     score_func=lambda x: x,
     pop_size=100,
-    n_masks=3,
-    lam=2.0,
-    valid_bitmasks=set(range(2 ** 21)),
+    n_masks=4,
+    lam=5.0,
+    valid_bitmasks=list(random.sample(range(2 ** 21), 123456)),
     high_score=True,
     n_keep=10,
 )
-
+#%%
 
 # def fitness(bitmask: int):
 #     pass
