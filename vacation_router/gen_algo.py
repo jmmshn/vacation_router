@@ -15,8 +15,18 @@ import random
 _logger = logging.getLogger(__name__)
 
 
+def print_bitmasks(bitmasks):
+    for bm in bitmasks:
+        print(f"{bm:#032b}")
+
+
 def perturb_bitmask(
-    bitmask: int, lam: float = 2.0, belong_to: set = None, exclude_mask: int = None
+    bitmask: int,
+    left_most: int = None,
+    lam: float = 2.0,
+    belong_to: set = None,
+    exclude_mask: int = None,
+    max_attempts: int = 10000,
 ):
     """
     Randomly flip bits in a bitmask use a poisson distribution for the number of bits to flip
@@ -28,11 +38,13 @@ def perturb_bitmask(
     Returns:
         a new bitmask
     """
+    if left_most is None:
+        left_most = len(bin(bitmask)) - 2
 
     def pert_once(bm):
         num_bits = np.random.poisson(lam=lam)
         # randomly select bits to flip
-        eligible_bits = range(max(len(bin(bm)) - 2, num_bits + 2))
+        eligible_bits = range(max(left_most, num_bits + 2))
         bits_to_flip = np.random.choice(eligible_bits, num_bits, replace=False)
 
         for bit in bits_to_flip:
@@ -42,7 +54,7 @@ def perturb_bitmask(
     if belong_to is None and exclude_mask is None:
         return pert_once(bitmask)
     else:
-        for i in range(100000):
+        for _ in range(max_attempts):
             bm = pert_once(bitmask)
             # _logger.debug(f"bm: {bm:#032b}, exclude: {exclude_bits:#032b}")
             if (belong_to is None or bm in belong_to) and (
@@ -53,18 +65,21 @@ def perturb_bitmask(
             raise Exception("Failed to pertub bitmask")
 
 
-def get_valid_puturbed_masks(bitmasks: List[float], valid_bitmasks: set=None, lam: float=2.0):
+def get_valid_puturbed_masks(
+    bitmasks: List[float], valid_bitmasks: set = None, **kwargs
+):
     """
     Starting for a set of bitmasks, perturb them and find a valid combination that does not clash
     """
     updated_masks = []
     seent_bits = 0
-    _logger.debug(f"bitmasks: {bitmasks}")
     for bm in bitmasks:
         new_mask = perturb_bitmask(
-            bm, belong_to=valid_bitmasks, exclude_mask=seent_bits, lam=lam
+            bm, belong_to=valid_bitmasks, exclude_mask=seent_bits, **kwargs
         )
-        _logger.debug(f"new_mask: {new_mask:#032b}")
+        # _logger.debug(f"seent_bits: {seent_bits:#010b}")
+        # _logger.debug(f"old_mask: {bm:#010b}")
+        # _logger.debug(f"new_mask: {new_mask:#010b}")
         seent_bits |= new_mask
         updated_masks.append(new_mask)
     return updated_masks
@@ -73,9 +88,9 @@ def get_valid_puturbed_masks(bitmasks: List[float], valid_bitmasks: set=None, la
 def get_best_perturbed_masks(
     bitmasks: int,
     valid_bitmasks: set,
-    lam: float,
     score_func: Callable,
     high_score: bool = True,
+    **kwargs,
 ):
     """
     Perturbe the first n-1 masks then loop through the valid bitmasks to find the best final bitmask
@@ -90,7 +105,7 @@ def get_best_perturbed_masks(
         the modified bitmasks
     """
     randomized_masks = get_valid_puturbed_masks(
-        bitmasks[:-1], set(valid_bitmasks), lam=lam
+        bitmasks[:-1], set(valid_bitmasks), **kwargs
     )
     if len(randomized_masks) != len(bitmasks) - 1:
         raise Exception("Failed to perturb masks")
@@ -105,6 +120,15 @@ def get_best_perturbed_masks(
         if all_masked_bits & bm == 0 and score_ > best_score:
             best_score = score_
             best_final_mask = bm
+    if best_final_mask is None:
+        _logger.warning(f"Failed to find best final mask")
+        return get_best_perturbed_masks(
+            bitmasks=bitmasks,
+            valid_bitmasks=valid_bitmasks,
+            score_func=score_func,
+            high_score=high_score,
+            **kwargs,
+        )
     _logger.debug(f"all_masked_bits: {all_masked_bits:#032b}")
     _logger.debug(f"best_final_mask: {best_final_mask:#032b}")
     return randomized_masks + [best_final_mask]
@@ -120,22 +144,62 @@ class GenePool:
     valid_bitmasks: set
     high_score: bool
     n_keep: int
-    
+    max_attempts: int
+    left_most: int
+
     def __post_init__(self):
         def _get_mask():
-            print(len(self.valid_bitmasks), self.n_masks)
-            bms = random.sample(self.valid_bitmasks, self.n_masks)
+            try:
+                bms = random.sample(self.valid_bitmasks, self.n_masks)
+                new_masks = get_valid_puturbed_masks(
+                    bitmasks=bms,
+                    valid_bitmasks=set(self.valid_bitmasks),
+                    lam=self.lam,
+                    left_most=self.left_most,
+                )
+                return new_masks
+            except Exception:
+                return _get_mask()
+        self.population = [_get_mask() for _ in range(self.pop_size)]
+
+    def fitness(self, bitmasks):
+        """
+        Calculate the total score of a set of bitmasks
+        """
+        return sum(map(self.score_func, bitmasks))
+
+    def population_fitness(self):
+        """
+        Calculate the average fitness of the population
+        """
+        return np.mean([self.fitness(bm) for bm in self.population])
+
+    def step(self):
+        """
+        Take the most fit members of the population
+        Pertube them to arrive at the new population
+        """
+
+        def _get_new_masks(masks):
             return get_best_perturbed_masks(
-                bitmasks=bms,
+                bitmasks=masks,
                 valid_bitmasks=set(self.valid_bitmasks),
                 lam=self.lam,
                 score_func=self.score_func,
                 high_score=self.high_score,
             )
-        self.factor = self.n_masks // self.n_keep
-        self.pop = [_get_mask() for _ in range(self.pop_size)]
 
+        # get the most fit n_keep members
+        self.population.sort(key=self.fitness, reverse=self.high_score)
+        self.population = self.population[: self.n_keep]
+        _logger.debug(f"population: {self.population}")
 
+        # perturb the batch of most fit members to get the new population
+        new_population = []
+        while len(new_population) < self.pop_size:
+            new_population.extend([*map(_get_new_masks, self.population)])
+        # randomely remove the extra members
+        self.population = random.sample(new_population, self.pop_size)
 
     # def get_most_fit(self):
     #     """
@@ -164,90 +228,42 @@ class GenePool:
 
 
 # %%
-logging.basicConfig(level=logging.DEBUG)
+random.seed(0)
+logging.basicConfig(level=logging.INFO)
 genepool = GenePool(
     score_func=lambda x: x,
-    pop_size=100,
-    n_masks=4,
-    lam=5.0,
-    valid_bitmasks=list(random.sample(range(2 ** 21), 123456)),
+    pop_size=10,
+    n_masks=3,
+    lam=2.0,
+    valid_bitmasks=range(0b1000000),
     high_score=True,
-    n_keep=10,
+    n_keep=2,
+    max_attempts=1000,
+    left_most=32,
 )
-#%%
+# %%
+print(genepool.population, genepool.population_fitness())
+genepool.population.sort(key=genepool.fitness, reverse=genepool.high_score)
+print(genepool.population, genepool.population_fitness())
 
-# def fitness(bitmask: int):
-#     pass
+# %%
+for i in range(5):
+    genepool.step()
+    print(f"{i}: {genepool.population_fitness()}")
 
-# def select_parents(population: list):
-#     pass
+# %%
 
-# def generate_population(population_size: int):
-#     pass
+# %%
+res = get_best_perturbed_masks(
+    [0b00110011, 0b000100101, 0b0111110],
+    score_func=lambda x: x,
+    lam=1,
+    valid_bitmasks=range(0b100000000),
+    left_most=6,
+)
+print_bitmasks(res)
+print(res)
 
-# def genetic_algorithm(population_size: int, num_generations: int):
-#     pass
+# %%
 
-
-# # %%
-# if __name__ == '__main__':
-#     least_time_json = loadfn("least_time.json")
-#     least_time_json = {eval(k): v for k, v in least_time_json.items()}
-#     parent_json = loadfn("parent.json")
-#     parent_json = {eval(k): tuple(v) for k, v in parent_json.items()}
-#     least_time = defaultdict(lambda: float("inf"))
-#     parent = defaultdict(lambda: None)
-#     least_time.update(least_time_json)
-#     parent.update(parent_json)
-#     # %%
-#     best_time_for_bitmask = defaultdict(lambda: float('inf'))
-#     best_seq_for_bitmask = defaultdict(lambda: None)
-#     for (node, bit_mask), best_time in tqdm(least_time.items()):
-#         if best_time == float('inf'):
-#             continue
-#         if best_time < best_time_for_bitmask[bit_mask]:
-#             best_time_for_bitmask[bit_mask] = best_time
-#             best_seq_for_bitmask[bit_mask] = get_sequence(parent, (node, bit_mask))
-#     valid_bitmasks = set(best_seq_for_bitmask.keys())
-# # %%
-# best_time_for_bitmask[4198928]
-# # %%
-# best_seq_for_bitmask[4198928]
-# # %%
-# # randomly select 4 bitmasks that do not share a common bit
-# bitmasks = [np.random.randint(0, 2**32) for _ in range(4)]
-
-
-# # %%
-# for _ in range(10):
-#     print(np.random.poisson(lam=5.5))
-
-
-# # %%
-# # printbm(4198928)
-# # printbm(pertub_bitmask(4198928, belong_to=valid_bitmasks) ^ 4198928)
-# # printbm(pertub_bitmask(4198928, belong_to=valid_bitmasks) ^ 4198928)
-# # printbm(pertub_bitmask(4198928, belong_to=valid_bitmasks) ^ 4198928)
-
-# # randomly select 4 bitmasks from valid_bitmasks
-# bitmasks = np.random.choice(list(valid_bitmasks), 3, replace=False)
-
-
-# for bm in get_best_perturbed_masks(bitmasks, best_time_for_bitmask):
-#     print(f"{bm:014d} -> {bm:#032b}")
-
-
-# # for bm in bitmasks:
-# #     pertub_bitmask(bitmasks)
-# # %%
-# logging.basicConfig(level=logging.INFO)
-# print(get_valid_triple(bitmasks))
-# # %%
-
-# def get_sequence(parent, idx):
-#     seq = []
-#     while idx != None:
-#         seq.append(idx[0])
-#         idx = parent[idx]
-#     return seq[::-1]
 # %%

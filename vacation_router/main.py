@@ -2,7 +2,7 @@
 from monty.serialization import loadfn
 import numpy as np
 import pandas as pd
-from genetic_alg import get_best_perturbed_masks
+from vacation_router.gen_algo import get_best_perturbed_masks
 # %%
 best_path_for_bm = loadfn("best_path_for_bm.json")
 valid_bitmasks = set(best_path_for_bm.keys())
