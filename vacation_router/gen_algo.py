@@ -133,8 +133,6 @@ def get_best_perturbed_masks(
     _logger.debug(f"best_final_mask: {best_final_mask:#032b}")
     return randomized_masks + [best_final_mask]
 
-
-# %%
 @dataclass
 class GenePool:
     score_func: Callable
@@ -173,6 +171,12 @@ class GenePool:
         Calculate the average fitness of the population
         """
         return np.mean([self.fitness(bm) for bm in self.population])
+    
+    def most_fit(self):
+        """
+        Calculate the average fitness of the population
+        """
+        return np.max([self.fitness(bm) for bm in self.population])
 
     def step(self):
         """
@@ -181,13 +185,15 @@ class GenePool:
         """
 
         def _get_new_masks(masks):
-            return get_best_perturbed_masks(
-                bitmasks=masks,
-                valid_bitmasks=set(self.valid_bitmasks),
-                lam=self.lam,
-                score_func=self.score_func,
-                high_score=self.high_score,
-            )
+            try:
+                return get_valid_puturbed_masks(
+                    bitmasks=masks,
+                    valid_bitmasks=set(self.valid_bitmasks),
+                    lam=self.lam,
+                    left_most=self.left_most,
+                )
+            except Exception:
+                return _get_new_masks(masks)
 
         # get the most fit n_keep members
         self.population.sort(key=self.fitness, reverse=self.high_score)
@@ -201,69 +207,31 @@ class GenePool:
         # randomely remove the extra members
         self.population = random.sample(new_population, self.pop_size)
 
-    # def get_most_fit(self):
-    #     """
-    #     Get the top most fit bitmasks
-    #     """
-    #     return sorted(
-    #         self.pop, key=lambda x: self.score_func(x[-1]), reverse=self.high_score
-    #     )[: self.n_keep]
-
-    # def mutate(self, bitmasks: List[int]):
-    #     """
-    #     Mutate a list of bitmasks
-    #     Args:
-    #         bitmasks: a list of bitmasks
-    #     """
-    #     return get_best_perturbed_masks(
-    #         bitmasks, self.valid_bitmasks, self.lam, self.score_func, self.high_score
-    #     )
-
-    # def step(self):
-    #     """
-    #     Step the genetic algorithm
-    #     """
-    #     bms = self.get_most_fit()
-    #     bms *= chain.from_iterable(bms * self.factor)
-
-
 # %%
 random.seed(0)
-logging.basicConfig(level=logging.INFO)
 genepool = GenePool(
     score_func=lambda x: x,
-    pop_size=10,
+    pop_size=8,
     n_masks=3,
-    lam=2.0,
-    valid_bitmasks=range(0b1000000),
+    lam=1.0,
+    valid_bitmasks=range(0b10000000),
     high_score=True,
     n_keep=2,
     max_attempts=1000,
-    left_most=32,
+    left_most=None
 )
+for bm in genepool.population:
+    print_bitmasks(bm)
+    print("====")
 # %%
-print(genepool.population, genepool.population_fitness())
-genepool.population.sort(key=genepool.fitness, reverse=genepool.high_score)
-print(genepool.population, genepool.population_fitness())
-
-# %%
-for i in range(5):
+for i in range(100):
+    print(f"{i}: {genepool.most_fit()}")
     genepool.step()
-    print(f"{i}: {genepool.population_fitness()}")
-
 # %%
+genepool.population = [[0b1000010, 0b0010000, 0b0000101]]*8
+for i in range(5):
+    print(f"{i}: {genepool.most_fit()}")
+    genepool.step()
 
-# %%
-res = get_best_perturbed_masks(
-    [0b00110011, 0b000100101, 0b0111110],
-    score_func=lambda x: x,
-    lam=1,
-    valid_bitmasks=range(0b100000000),
-    left_most=6,
-)
-print_bitmasks(res)
-print(res)
-
-# %%
 
 # %%
