@@ -1,7 +1,7 @@
 # Planning Your Next Vacation Using Graph Theory and Genetic Algorithms
 
 Planning a vacation is hard work, with so many different points of interest (POI) and limited time, it is difficult to create an itinerary that simultaneously aims to hit as many points of interest as possible in an optimized fashion and does not make the vacation feel too stressful.
-Additionally, since there are always more points of interest than you have time for, nailing down an itinerary means deciding which POI's to skip and living with the lingering doubt that the attraction you skipped would have provided a life-changing experience.
+Additionally, since there are always more points of interest than you have time for, nailing down an itinerary means deciding which POIs to skip and living with the lingering doubt that the attraction you skipped would have provided a life-changing experience.
 While the algorithm presented here cannot guarantee that you won't miss out on any life-affirming moments in your travels, it will allow you to blame missed attractions on an internet stranger's silly algorithm which is the closest you can get to peace of mind this situation
 
 # The Human Inputs 
@@ -12,7 +12,7 @@ Aside from the common list of attractions that can be found on any given travel 
 Once such a list is compiled, the two most important pieces of information for each POI in this list are:
 
 1. `dwell_time`: an estimate of the time spent at each POI 
-2. `score`: some kind of positive-definite score assigned to each point of interest indicating the level of interest from the members.
+2. `score`: a positive-definite score assigned to each point of interest indicating the level of interest from the members.
 
 The information here should be stored in a CSV file.
 
