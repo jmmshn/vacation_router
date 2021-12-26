@@ -1,8 +1,8 @@
 # Planning Your Next Vacation Using Graph Theory and Genetic Algorithms
 
-Planning a vacation is hard work, with so many different points of interest (POI) and limited time, it is difficult to create an itinerary that simultaneously aims to hit as many points of interest as possible in an optimized fashion and does not make the vacation feel too stressful.
+Planning a vacation is hard work. With so many different points of interest (POI) and limited time, it is difficult to create an itinerary that simultaneously aims to hit as many points of interest as possible in an optimized fashion and does not make the vacation feel too stressful.
 Additionally, since there are always more points of interest than you have time for, nailing down an itinerary means deciding which POIs to skip and living with the lingering doubt that the attraction you skipped would have provided a life-changing experience.
-While the algorithm presented here cannot guarantee that you won't miss out on any life-affirming moments in your travels, it will allow you to blame missed attractions on an internet stranger's silly algorithm which is the closest you can get to peace of mind this situation
+While the algorithm presented here cannot guarantee that you won't miss out on any life-affirming moments in your travels, it will allow you to blame missed attractions on an internet stranger's silly algorithm, which is the closest you can get to peace of mind in this situation.
 
 # The Human Inputs 
 
@@ -12,14 +12,14 @@ Aside from the common list of attractions that can be found on any given travel 
 Once such a list is compiled, the two most important pieces of information for each POI in this list are:
 
 1. `dwell_time`: an estimate of the time spent at each POI 
-2. `score`: a positive-definite score assigned to each point of interest indicating the level of interest from the members.
+2. `score`: a positive-definite score assigned to each POI indicating the level of interest from the members.
 
 The information here should be stored in a CSV file.
 
 # Get Latitude and Longitude from Google Maps
 
-Once the full list of POIs is compiled, we will need to get their exact position on the map.
-To do this, we will first use Google's "My Map" feature to store and visualize all of the POI's in a city. 
+Once the full list of POIs is compiled, we will need to get their exact location on the map.
+To do this, we will first use Google's "My Map" feature to store and visualize all of the POIs in a city. 
 
 ![](google_map.png)
 
@@ -30,9 +30,9 @@ This KML file will be parsed by our python code to get the exact latitude and lo
 
 An example of the `kml` file is given in the GitHub repo at `test_files/Toronto2021.kml`.
 
-# Parsing the data from the user inputs
+# Parsing the data from user inputs
 
-At this step, you need to ensure that the names of the POI's in the CSV file from the user input data match the names of the POIs in the KML file.
+At this step, you need to ensure that the names of the POIs in the CSV file from the user input data match the names of the POIs in the KML file.
 The data in the `user_input.csv` file should look like this:
 |                      name                      | time | score |
 | ---------------------------------------------- | ---- | ----- |
@@ -92,8 +92,8 @@ Our path-finding algorithm is designed to address the question of
 
 >What is the least-time pathway through all combinations of nodes?
 
-To compute this, we will perform as standard minimum cost path-finding with the additional constraint that we can only directly compare paths that have visited the same set of nodes.
-For book-keeping purposes (and a bit of bit-twidling fun), we will use an integer bitmask to keep track of the visited nodes in a given path.
+To compute this, we will perform a standard minimum cost path-finding with the additional constraint that we can only directly compare paths that have visited the same set of nodes.
+For book-keeping purposes (and a bit of bit-twiddling fun), we will use an integer bitmask to keep track of the visited nodes in a given path.
 The algorithm will use a queue that consisting of `(j, mask)` pairs where `j` is the node value to be processed and `mask` is an integer where n-th bit from the right is set to `1` if and only if the n-th node has been visited. 
 Note that the `j`-th bit of `mask` will always be `1` since `j` is always the last visited node.
 The complete algorithm is outlined below:
@@ -114,7 +114,7 @@ The complete algorithm is outlined below:
 
 A graphical illustration of the algorithm is given below. The key-value pairs in the `least_time` dictionary are shown next to each node `j`.
 For simplicity, we will ignore the dwell time, but they are trivially added during graph traversal in the full implementation.
-The queue will initialize with a single "on" bit at each node, and the value for the key `(j, mask)` of then `least_time` dictionary are shown next to the node `j`.
+The queue will initialize with a single "on" bit at each node, and the value for the key `(j, mask)` of the `least_time` dictionary is shown next to the node `j`.
 
 ![](graph_1.png)
 
@@ -128,11 +128,11 @@ Note that up until this point, the order in which the nodes were visited did not
 
 ![](graph_3.png)
 
-Once we start looking at the length 3 paths we see that the state `(2, 0111)` can be reached by `(1, 0011) >> 3` → `(2, 0111) >> 8` and `(0, 0011) >> 3` → `(2, 0111) >> 10`. In this case, we only need to keep the lower value `(2, 0111) >> 8`.
-And since our queue poping and appending order ensures that we analyze all the paths of length N before we look at the paths of length N+1, we can be sure that the minimum is always found.
+Once we start looking at paths of length three we see that the state `(2, 0111)` can be reached by `(1, 0011) >> 3` → `(2, 0111) >> 8` and `(0, 0011) >> 3` → `(2, 0111) >> 10`. In this case, we only need to keep the lower value `(2, 0111) >> 8`.
+And since our queue's popping and appending order ensures that we analyze all the paths of length N before we look at the paths of length N+1, we can be sure that the minimum is always found.
 
 The algorithm outlined above is still incredibly poor-scaling, some constraints are needed to make it practically useful.
-Since we are already constrained by the amount of time in a given day, we should supply the algorithm with a `max_time` that limits the total time (dwell_time and travel_time) allowed for each path.
+Since we are already constrained by the amount of time in a given day, we should supply the algorithm with a `max_time` that limits the total time (`dwell_time` and `travel_time`) allowed for each path.
 The full implementation of the algorithm is given in:
 https://github.com/jmmshn/vacation_routing/blob/main/vacation_router/pathfinder.py
 
@@ -168,7 +168,7 @@ def get_score(bm):
     return score
 ```
 
-The task at hand is to find the best combination of bitmasks that will maximize the total score while ensuring that no attraction is visited more than once (ie None of the bitmasks can overlap). 
+The task at hand is to find the best combination of bitmasks that will maximize the total score while ensuring that no attraction is visited more than once (i.e. None of the bitmasks can overlap). 
 We can accomplish this by using a genetic algorithm.
 The simple genetic algorithm implemented here does not have any breeding mechanism and only mutates the population from generation to generation.
 For a 3 day trip, the population is composed of a list of 500 triplets of the form `(bm1, bm2, bm3)` where `bm1` is the bitmask for the first day, `bm2` is the bitmask for the second day, and `bm3` is the bitmask for the third day.
